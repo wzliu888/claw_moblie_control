@@ -6,6 +6,7 @@ import com.jcraft.jsch.Session
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -35,12 +36,15 @@ class SshTunnelManager {
 
     private var session: Session? = null
     private var heartbeatJob: Job? = null
+    private var scope: CoroutineScope? = null
 
     @Volatile private var shouldReconnect = false
 
     fun start(config: SshConfig, onStateChange: ((State) -> Unit)? = null) {
         shouldReconnect = true
-        CoroutineScope(Dispatchers.IO).launch {
+        scope?.cancel()
+        scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        scope!!.launch {
             connectWithRetry(config, onStateChange)
         }
     }
@@ -48,6 +52,8 @@ class SshTunnelManager {
     fun stop() {
         shouldReconnect = false
         heartbeatJob?.cancel()
+        scope?.cancel()
+        scope = null
         disconnect()
         state = State.DISCONNECTED
     }
@@ -109,7 +115,7 @@ class SshTunnelManager {
 
     private fun startHeartbeat(config: SshConfig, onStateChange: ((State) -> Unit)?) {
         heartbeatJob?.cancel()
-        heartbeatJob = CoroutineScope(Dispatchers.IO).launch {
+        heartbeatJob = scope!!.launch {
             while (isActive && shouldReconnect) {
                 delay(30_000L)
                 if (!isConnected()) {
