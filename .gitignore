@@ -1,0 +1,42 @@
+
+# Environment files (all subdirectories)
+**/.env
+**/.env.*
+!**/.env.example
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+out/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Runtime
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Android
+android/local.properties
+android/.gradle/
+android/app/build/
+android/build/
+*.keystore
+*.jks
+
+# TypeScript
+*.tsbuildinfo
+
+# Playwright screenshots
+.playwright-mcp/

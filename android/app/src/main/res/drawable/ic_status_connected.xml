@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Green pill badge with a checkmark -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#1A2ECC71" />
+            <size android:width="20dp" android:height="20dp" />
+        </shape>
+    </item>
+    <item
+        android:width="10dp"
+        android:height="10dp"
+        android:gravity="center">
+        <shape android:shape="oval">
+            <solid android:color="#2ECC71" />
+        </shape>
+    </item>
+</layer-list>

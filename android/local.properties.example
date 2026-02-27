@@ -1,0 +1,6 @@
+# Copy this file to local.properties and fill in your values
+sdk.dir=/Users/YOUR_USERNAME/Library/Android/sdk
+
+# WebSocket server URL
+# Use 10.0.2.2 for Android Emulator pointing to localhost
+WS_URL=ws://10.0.2.2:3000

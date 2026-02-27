@@ -1,0 +1,61 @@
+# Build backend image and push to Alibaba Cloud Container Registry (ACR),
+# for deployment to ACK or other targets.
+#
+# Setup:
+# 1. Create ACR repository (e.g. ACR EE) in the desired region.
+# 2. Add GitHub Actions secrets: CN_ACCESS_KEY_ID, CN_ACCESS_KEY_SECRET.
+# 3. Adjust REGION_ID, registry, instance-id, namespace below if needed.
+
+name: Backend — Build & Push to ACR
+
+on:
+  push:
+    branches: [main, dev]
+    # 任意 push 到 main/dev 都会构建并推送镜像；若只想在改 backend 时构建，可恢复下面的 paths
+    # paths:
+    #   - 'web/backend/**'
+    #   - '.github/workflows/backend-acr.yml'
+  workflow_dispatch:  # 在 GitHub Actions 页面可手动点击 Run workflow
+
+env:
+  # China (Shanghai) ACR EE — change to your registry
+  CN_REGION_ID: cn-shanghai
+  CN_ACR_EE_REGISTRY: thinkingme-registry.cn-shanghai.cr.aliyuncs.com
+  CN_ACR_EE_INSTANCE_ID: cri-myfpa948e0f8qob2
+  CN_ACR_EE_NAMESPACE: thinkeme
+  CN_ACR_EE_IMAGE: clawpaw
+  TAG: ${{ github.sha }}-${{ github.run_number }}-${{ github.run_id }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to ACR EE (CN)
+        uses: aliyun/acr-login@v1
+        with:
+          login-server: "https://${{ env.CN_ACR_EE_REGISTRY }}"
+          region-id: "${{ env.CN_REGION_ID }}"
+          access-key-id: "${{ secrets.CN_ACCESS_KEY_ID }}"
+          access-key-secret: "${{ secrets.CN_ACCESS_KEY_SECRET }}"
+          instance-id: "${{ env.CN_ACR_EE_INSTANCE_ID }}"
+
+      - name: Build and push image
+        run: |
+          docker build \
+            --tag "$CN_ACR_EE_REGISTRY/$CN_ACR_EE_NAMESPACE/$CN_ACR_EE_IMAGE:$TAG" \
+            -f web/backend/Dockerfile \
+            web
+          docker push "$CN_ACR_EE_REGISTRY/$CN_ACR_EE_NAMESPACE/$CN_ACR_EE_IMAGE:$TAG"
+        env:
+          CN_ACR_EE_REGISTRY: ${{ env.CN_ACR_EE_REGISTRY }}
+          CN_ACR_EE_NAMESPACE: ${{ env.CN_ACR_EE_NAMESPACE }}
+          CN_ACR_EE_IMAGE: ${{ env.CN_ACR_EE_IMAGE }}
+          TAG: ${{ env.TAG }}

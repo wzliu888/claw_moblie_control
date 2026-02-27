@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ClawPaw</string>
+    <string name="tagline">Your phone. Any AI. Anywhere.</string>
+    <string name="sign_in_with_google">Sign in with Google</string>
+    <string name="status_connecting">Connecting…</string>
+    <string name="status_connected">Connected ✓</string>
+    <string name="status_disconnected">Disconnected</string>
+    <string name="accessibility_service_description">Allows ClawPaw to take screenshots and control the UI remotely.</string>
+</resources>

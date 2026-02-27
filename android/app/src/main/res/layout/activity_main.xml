@@ -1,0 +1,394 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingTop="72dp"
+        android:paddingBottom="48dp"
+        android:paddingStart="32dp"
+        android:paddingEnd="32dp">
+
+        <!-- Logo -->
+        <ImageView
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:src="@drawable/logo"
+            android:contentDescription="ClawPaw logo"
+            android:scaleType="fitCenter" />
+
+        <!-- App name -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="ClawPaw"
+            android:textColor="@color/text_primary"
+            android:textSize="36sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.02" />
+
+        <!-- Tagline -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/tagline"
+            android:textColor="@color/text_secondary"
+            android:textSize="15sp"
+            android:gravity="center"
+            android:lineSpacingMultiplier="1.4" />
+
+        <!-- Connect button (pre-login) -->
+        <Button
+            android:id="@+id/btnConnect"
+            android:layout_width="220dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="48dp"
+            android:text="Connect"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="@color/accent" />
+
+        <!-- Loading indicator -->
+        <LinearLayout
+            android:id="@+id/layoutLoading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="48dp"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:visibility="gone">
+
+            <FrameLayout
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:layout_gravity="center_horizontal">
+
+                <View
+                    android:id="@+id/pulseRing1"
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/pulse_ring"
+                    android:alpha="0" />
+
+                <View
+                    android:id="@+id/pulseRing2"
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/pulse_ring"
+                    android:alpha="0" />
+
+                <View
+                    android:id="@+id/pulseDot"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/pulse_dot" />
+
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tvLoadingStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="Connecting…"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp"
+                android:letterSpacing="0.05" />
+
+        </LinearLayout>
+
+        <!-- Post-login panel -->
+        <LinearLayout
+            android:id="@+id/layoutLoggedIn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="32dp"
+            android:visibility="gone">
+
+            <!-- Status section: WS + SSH -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#131318"
+                android:paddingTop="16dp"
+                android:paddingBottom="16dp"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="STATUS"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="10sp"
+                    android:letterSpacing="0.12"
+                    android:layout_marginBottom="12dp" />
+
+                <!-- WS status row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <ImageView
+                        android:id="@+id/ivWsStatusDot"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_status_disconnected"
+                        android:contentDescription="WS status" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_marginStart="10dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Backend connection"
+                            android:textColor="@color/text_primary"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/tvWsStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="11sp"
+                            android:layout_marginTop="2dp" />
+
+                    </LinearLayout>
+
+                    <Button
+                        android:id="@+id/btnRetryWs"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Retry"
+                        android:textSize="11sp"
+                        android:textColor="#DC3232"
+                        android:visibility="gone"
+                        style="@style/Widget.AppCompat.Button.Borderless" />
+
+                </LinearLayout>
+
+                <!-- SSH status row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="12dp">
+
+                    <ImageView
+                        android:id="@+id/ivSshStatusDot"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_status_disconnected"
+                        android:contentDescription="SSH status" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_marginStart="10dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="SSH tunnel"
+                            android:textColor="@color/text_primary"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/tvSshStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="11sp"
+                            android:layout_marginTop="2dp"
+                            android:text="Not configured" />
+
+                    </LinearLayout>
+
+                    <Button
+                        android:id="@+id/btnRetrySsh"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Retry"
+                        android:textSize="11sp"
+                        android:textColor="#DC3232"
+                        android:visibility="gone"
+                        style="@style/Widget.AppCompat.Button.Borderless" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Credentials section: UID + Secret -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#131318"
+                android:paddingTop="16dp"
+                android:paddingBottom="16dp"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:layout_marginTop="12dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="CREDENTIALS"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="10sp"
+                    android:letterSpacing="0.12"
+                    android:layout_marginBottom="10dp" />
+
+                <!-- UID row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="10dp">
+
+                    <TextView
+                        android:layout_width="48dp"
+                        android:layout_height="wrap_content"
+                        android:text="UID"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:id="@+id/tvUid"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/text_primary"
+                        android:textSize="11sp"
+                        android:fontFamily="monospace"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+
+                </LinearLayout>
+
+                <!-- Secret row -->
+                <LinearLayout
+                    android:id="@+id/layoutSecret"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="48dp"
+                        android:layout_height="wrap_content"
+                        android:text="Secret"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:id="@+id/tvSecret"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/text_primary"
+                        android:textSize="11sp"
+                        android:fontFamily="monospace"
+                        android:singleLine="true"
+                        android:ellipsize="end"
+                        android:text="—" />
+
+                    <!-- Reset secret icon -->
+                    <ImageView
+                        android:id="@+id/ivResetSecret"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:layout_marginStart="8dp"
+                        android:src="@drawable/ic_refresh"
+                        android:background="@drawable/bg_icon_btn"
+                        android:padding="6dp"
+                        android:alpha="0.7"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:contentDescription="Reset secret" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- MCP config row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="#131318"
+                android:paddingTop="14dp"
+                android:paddingBottom="14dp"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:layout_marginTop="2dp"
+                android:id="@+id/layoutMcpConfig"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:id="@+id/ivMcpIcon"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_robot"
+                    android:alpha="0.6"
+                    android:contentDescription="Connect to agent" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="Connect to your agent"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="›"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="18sp" />
+
+            </LinearLayout>
+
+            <!-- Sign Out at bottom -->
+            <Button
+                android:id="@+id/btnLogout"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="64dp"
+                android:text="Sign Out"
+                android:textColor="@color/text_secondary"
+                style="@style/Widget.AppCompat.Button.Borderless" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

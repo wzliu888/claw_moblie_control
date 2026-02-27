@@ -1,0 +1,64 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+// Load local.properties into project properties
+def localProps = new Properties()
+def localPropsFile = rootProject.file('local.properties')
+if (localPropsFile.exists()) {
+    localPropsFile.withInputStream { localProps.load(it) }
+}
+
+android {
+    namespace 'com.clawpaw.phonecontrol'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.clawpaw.phonecontrol"
+        minSdk 24
+        targetSdk 35
+        versionCode 1
+        versionName "1.0"
+
+        buildConfigField "String", "WS_URL", "\"${localProps.getProperty('WS_URL', 'ws://10.0.2.2:3000')}\""
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+
+    // OkHttp WebSocket
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+
+    // Coroutines
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+
+    // Gson (JSON-RPC serialization)
+    implementation 'com.google.code.gson:gson:2.10.1'
+
+    // JSch — pure Java SSH client for reverse tunnel
+    implementation 'com.github.mwiede:jsch:0.2.18'
+}
