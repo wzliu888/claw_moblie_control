@@ -82,11 +82,21 @@ export async function pressKey(uid: string, key: string): Promise<string> {
 export async function screenshot(uid: string): Promise<{ data: string; mimeType: string }> {
   const target = await deviceTarget(uid);
   // Use exec-out to stream raw bytes directly — avoids relying on `base64` binary on device
-  const { stdout } = await execFileAsync(
-    'adb', ['-s', target, 'exec-out', 'screencap', '-p'],
-    { timeout: 15_000, maxBuffer: 20 * 1024 * 1024, encoding: 'buffer' } as any,
-  );
-  return { data: (stdout as unknown as Buffer).toString('base64'), mimeType: 'image/png' };
+  console.log(`[screenshot] target=${target}`);
+  try {
+    const { stdout } = await execFileAsync(
+      'adb', ['-s', target, 'exec-out', 'screencap', '-p'],
+      { timeout: 15_000, maxBuffer: 20 * 1024 * 1024, encoding: 'buffer' } as any,
+    );
+    const buf = stdout as unknown as Buffer;
+    console.log(`[screenshot] success, bytes=${buf.length}`);
+    return { data: buf.toString('base64'), mimeType: 'image/png' };
+  } catch (e: any) {
+    console.error(`[screenshot] FAILED: code=${e.code} signal=${e.signal}`);
+    console.error(`[screenshot] stdout=${String(e.stdout ?? '').slice(0, 200)}`);
+    console.error(`[screenshot] stderr=${String(e.stderr ?? '').slice(0, 200)}`);
+    throw new Error(`screenshot failed: ${String(e.stderr ?? e.stdout ?? e.message ?? e).slice(0, 500)}`);
+  }
 }
 
 export async function shell(uid: string, command: string): Promise<string> {
