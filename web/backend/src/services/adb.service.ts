@@ -25,8 +25,10 @@ async function adb(uid: string, ...args: string[]): Promise<string> {
     const { stdout, stderr } = await execFileAsync('adb', ['-s', target, ...args], { timeout: 15_000 });
     return (stdout + stderr).trim();
   } catch (e: any) {
-    const detail = (e.stdout ?? '') + (e.stderr ?? '');
-    throw new Error(`Command failed: adb -s ${target} ${args.join(' ')}\n${detail.trim()}`);
+    const stdout = (e.stdout ?? '').trim();
+    const stderr = (e.stderr ?? '').trim();
+    const detail = [stdout, stderr].filter(Boolean).join('\n');
+    throw new Error(`Command failed: adb -s ${target} ${args.join(' ')}\n${detail || '(no output)'}`);
   }
 }
 
