@@ -18,6 +18,20 @@ The MCP server translates LLM tool calls into ADB commands forwarded to your pho
 
 ---
 
+## Claude Code Skill
+
+If you're using **Claude Code**, there's a built-in skill to guide you through the full setup interactively — installing the APK, granting permissions, verifying the SSH tunnel, and configuring the MCP server.
+
+Clone this repo and run in Claude Code:
+
+```
+/clawpaw-setup
+```
+
+Claude will walk you through each step, run checks automatically, and help troubleshoot any issues.
+
+---
+
 ## Setup Guide
 
 ### Step 1 — Install the Android app
