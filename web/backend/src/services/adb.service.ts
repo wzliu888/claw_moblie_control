@@ -6,11 +6,15 @@ const execFileAsync = promisify(execFile);
 
 const repo = new SshCredentialRepository();
 
-// adb device target: 127.0.0.1:<adbPort>
+// adb device target: SSH_HOST_IP:<adbPort>
+// SSH_HOST_IP defaults to 127.0.0.1 but must be set to the internal IP of the
+// node running sshd when the backend pod runs on a different node.
+const SSH_HOST_IP = process.env.SSH_HOST_IP ?? '127.0.0.1';
+
 async function deviceTarget(uid: string): Promise<string> {
   const cred = await repo.findByUid(uid);
   if (!cred) throw new Error(`No SSH credentials for uid=${uid}`);
-  return `127.0.0.1:${cred.adb_port}`;
+  return `${SSH_HOST_IP}:${cred.adb_port}`;
 }
 
 async function adb(uid: string, ...args: string[]): Promise<string> {
