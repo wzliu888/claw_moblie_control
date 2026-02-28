@@ -3,8 +3,9 @@ import { IncomingMessage } from 'http';
 import { Server } from 'http';
 import { URL } from 'url';
 
-const PING_INTERVAL_MS = 5_000;
-const RPC_TIMEOUT_MS   = 30_000;
+const PING_INTERVAL_MS  = 20_000;  // send ping every 20s
+const PING_MAX_MISSED   = 2;        // terminate after 2 consecutive missed pongs
+const RPC_TIMEOUT_MS    = 30_000;
 const ts = () => new Date().toISOString().slice(11, 19); // HH:MM:SS
 
 // uid -> connected phone WebSocket
@@ -35,20 +36,20 @@ export function initWsServer(httpServer: Server): void {
     console.log(`[WS] uid=${uid} connected (total=${sessions.size})`);
 
     // Server-side ping/pong to detect dead connections
-    let alive = true;
+    let missedPongs = 0;
     const pingTimer = setInterval(() => {
-      if (!alive) {
-        console.warn(`[WS] uid=${uid} pong timeout — terminating`);
+      if (missedPongs >= PING_MAX_MISSED) {
+        console.warn(`[WS] uid=${uid} missed ${missedPongs} pongs — terminating`);
         ws.terminate();
         return;
       }
-      alive = false;
-      console.log(`[WS] ping → uid=${uid} t=${ts()}`);
+      missedPongs++;
+      console.log(`[WS] ping → uid=${uid} t=${ts()} (missed=${missedPongs})`);
       ws.ping();
     }, PING_INTERVAL_MS);
 
     ws.on('pong', () => {
-      alive = true;
+      missedPongs = 0;
       console.log(`[WS] pong ← uid=${uid} t=${ts()}`);
     });
 

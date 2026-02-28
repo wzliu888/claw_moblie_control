@@ -33,7 +33,7 @@ class WsClient(
         private set
 
     private val client = OkHttpClient.Builder()
-        .pingInterval(5, TimeUnit.SECONDS)
+        .pingInterval(0, TimeUnit.SECONDS)  // disable OkHttp ping — server handles heartbeat
         .readTimeout(0, TimeUnit.MILLISECONDS)
         .build()
 
