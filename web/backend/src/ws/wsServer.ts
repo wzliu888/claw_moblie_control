@@ -3,8 +3,8 @@ import { IncomingMessage } from 'http';
 import { Server } from 'http';
 import { URL } from 'url';
 
-const PING_INTERVAL_MS  = 20_000;  // send ping every 20s
-const PING_MAX_MISSED   = 2;        // terminate after 2 consecutive missed pongs
+const PING_INTERVAL_MS  = 60_000;  // send ping every 60s
+const PING_MAX_MISSED   = 2;        // terminate after 2 consecutive missed pongs (~2min tolerance)
 const RPC_TIMEOUT_MS    = 30_000;
 const ts = () => new Date().toISOString().slice(11, 19); // HH:MM:SS
 
