@@ -17,10 +17,20 @@ async function deviceTarget(uid: string): Promise<string> {
   return `${SSH_HOST_IP}:${cred.adb_port}`;
 }
 
+async function ensureConnected(target: string): Promise<void> {
+  // Check if device is reachable; if offline, disconnect first to clear stale state
+  try {
+    const { stdout } = await execFileAsync('adb', ['-s', target, 'get-state'], { timeout: 5_000 });
+    if (stdout.trim() === 'device') return; // already online
+  } catch { /* offline or not found — fall through */ }
+
+  await execFileAsync('adb', ['disconnect', target]).catch(() => {});
+  await execFileAsync('adb', ['connect', target], { timeout: 10_000 }).catch(() => {});
+}
+
 async function adb(uid: string, ...args: string[]): Promise<string> {
   const target = await deviceTarget(uid);
-  // Ensure adb server is running and device is connected
-  await execFileAsync('adb', ['connect', target]).catch(() => {});
+  await ensureConnected(target);
   try {
     const { stdout, stderr } = await execFileAsync('adb', ['-s', target, ...args], { timeout: 15_000 });
     return (stdout + stderr).trim();
@@ -83,6 +93,7 @@ export async function pressKey(uid: string, key: string): Promise<string> {
 
 export async function screenshot(uid: string): Promise<{ data: string; mimeType: string }> {
   const target = await deviceTarget(uid);
+  await ensureConnected(target);
   // Use exec-out to stream raw bytes directly — avoids relying on `base64` binary on device
   console.log(`[screenshot] target=${target}`);
   try {
