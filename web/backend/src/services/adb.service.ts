@@ -21,23 +21,47 @@ async function ensureConnected(target: string): Promise<void> {
   // Check if device is reachable; if offline, disconnect first to clear stale state
   try {
     const { stdout } = await execFileAsync('adb', ['-s', target, 'get-state'], { timeout: 5_000 });
-    if (stdout.trim() === 'device') return; // already online
-  } catch { /* offline or not found — fall through */ }
+    const state = stdout.trim();
+    if (state === 'device') {
+      console.log(`[adb] ensureConnected target=${target} state=device (ok)`);
+      return; // already online
+    }
+    console.warn(`[adb] ensureConnected target=${target} state=${state || '(empty)'} — reconnecting`);
+  } catch (e: any) {
+    console.warn(`[adb] ensureConnected target=${target} get-state failed: ${e.stderr?.trim() || e.message} — reconnecting`);
+  }
 
-  await execFileAsync('adb', ['disconnect', target]).catch(() => {});
-  await execFileAsync('adb', ['connect', target], { timeout: 10_000 }).catch(() => {});
+  try {
+    const { stdout: dcOut } = await execFileAsync('adb', ['disconnect', target], { timeout: 5_000 });
+    console.log(`[adb] disconnect target=${target} → ${dcOut.trim()}`);
+  } catch (e: any) {
+    console.warn(`[adb] disconnect target=${target} failed: ${e.message}`);
+  }
+
+  try {
+    const { stdout: connOut } = await execFileAsync('adb', ['connect', target], { timeout: 10_000 });
+    console.log(`[adb] connect target=${target} → ${connOut.trim()}`);
+  } catch (e: any) {
+    console.error(`[adb] connect target=${target} FAILED: ${e.stderr?.trim() || e.message}`);
+  }
 }
 
 async function adb(uid: string, ...args: string[]): Promise<string> {
   const target = await deviceTarget(uid);
   await ensureConnected(target);
+  const cmd = `adb -s ${target} ${args.join(' ')}`;
+  const t0 = Date.now();
   try {
     const { stdout, stderr } = await execFileAsync('adb', ['-s', target, ...args], { timeout: 15_000 });
+    console.log(`[adb] ${cmd} → ok (${Date.now() - t0}ms)`);
+    if (stderr.trim()) console.warn(`[adb] stderr: ${stderr.trim()}`);
     return (stdout + stderr).trim();
   } catch (e: any) {
     const stdout = (e.stdout ?? '').trim();
     const stderr = (e.stderr ?? '').trim();
     const detail = [stdout, stderr].filter(Boolean).join('\n');
+    console.error(`[adb] ${cmd} → FAILED (${Date.now() - t0}ms) code=${e.code} signal=${e.signal}`);
+    if (detail) console.error(`[adb] output: ${detail}`);
     throw new Error(`Command failed: adb -s ${target} ${args.join(' ')}\n${detail || '(no output)'}`);
   }
 }
@@ -93,9 +117,10 @@ export async function pressKey(uid: string, key: string): Promise<string> {
 
 export async function screenshot(uid: string): Promise<{ data: string; mimeType: string }> {
   const target = await deviceTarget(uid);
+  console.log(`[screenshot] uid=${uid} target=${target}`);
   await ensureConnected(target);
   // Use exec-out to stream raw bytes directly — avoids relying on `base64` binary on device
-  console.log(`[screenshot] target=${target}`);
+  console.log(`[screenshot] ensureConnected done, capturing…`);
   try {
     const { stdout } = await execFileAsync(
       'adb', ['-s', target, 'exec-out', 'screencap', '-p'],
