@@ -1,7 +1,6 @@
 package com.clawpaw.phonecontrol
 
 import android.content.Context
-import android.content.Intent
 import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.JsonObject
@@ -19,7 +18,10 @@ private const val TAG = "CommandDispatcher"
  *   { "id": "<id>", "result": <any> }          on success
  *   { "id": "<id>", "error": { "message": "..." } }  on failure
  */
-class CommandDispatcher(private val context: Context) {
+class CommandDispatcher(
+    private val context: Context,
+    private val onReconnectSsh: (() -> Unit)? = null,
+) {
 
     private val gson                  = Gson()
     private val hardwareHandler       = HardwareHandler(context)
@@ -107,10 +109,7 @@ class CommandDispatcher(private val context: Context) {
     }
 
     private suspend fun reconnectSsh(@Suppress("UNUSED_PARAMETER") params: JsonObject): Any {
-        val intent = Intent(context, WsService::class.java).apply {
-            action = "com.clawpaw.ACTION_RECONNECT_SSH"
-        }
-        context.startService(intent)
+        onReconnectSsh?.invoke()
         return mapOf("triggered" to true)
     }
 
