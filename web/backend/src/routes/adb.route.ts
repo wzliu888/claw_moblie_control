@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { SecretRepository } from '../repositories/secret.repository';
 import * as adb from '../services/adb.service';
+import { forwardRpc } from '../ws/wsServer';
 
 const router = Router();
 const secretRepo = new SecretRepository();
@@ -36,7 +37,18 @@ router.post('/:method', async (req: Request, res: Response) => {
       case 'swipe':       result = await adb.swipe(uid, params.x1, params.y1, params.x2, params.y2, params.duration); break;
       case 'type_text':   result = await adb.typeText(uid, params.text); break;
       case 'press_key':   result = await adb.pressKey(uid, params.key); break;
-      case 'screenshot':  result = await adb.screenshot(uid); break;
+      case 'screenshot': {
+        // Route via WebSocket to the phone's AccessibilityService — much faster than adb exec-out.
+        // Falls back to adb if the phone is not connected via WS.
+        const wsResult = await forwardRpc(uid, 'screenshot', {
+          maxWidth: params.maxWidth,
+          quality:  params.quality,
+        });
+        if (wsResult.success) { result = wsResult.data; break; }
+        console.warn(`[screenshot] WS failed (${wsResult.error}) — falling back to adb`);
+        result = await adb.screenshot(uid);
+        break;
+      }
       case 'shell':       result = await adb.shell(uid, params.command); break;
       case 'launch_app':  result = await adb.launchApp(uid, params.package); break;
       case 'list_apps':   result = await adb.listApps(uid); break;
