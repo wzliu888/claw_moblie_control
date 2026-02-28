@@ -20,12 +20,14 @@ private const val TAG = "CommandDispatcher"
  */
 class CommandDispatcher(context: Context) {
 
-    private val gson = Gson()
-    private val hardwareHandler = HardwareHandler(context)
-    private val uiHandler       = UiHandler()
-    private val deviceHandler   = DeviceHandler(context)
-    private val appsHandler     = AppsHandler(context)
-    private val mediaHandler    = MediaHandler(context)
+    private val gson                  = Gson()
+    private val hardwareHandler       = HardwareHandler(context)
+    private val uiHandler             = UiHandler()
+    private val deviceHandler         = DeviceHandler(context)
+    private val appsHandler           = AppsHandler(context)
+    private val mediaHandler          = MediaHandler(context)
+    private val communicationHandler  = CommunicationHandler(context)
+    private val filesHandler          = FilesHandler()
 
     /** All registered method → handler mappings */
     private val handlers: Map<String, suspend (JsonObject) -> Any> = mapOf(
@@ -57,6 +59,14 @@ class CommandDispatcher(context: Context) {
         "audio_record"  to mediaHandler::audioRecord,
         "audio_status"  to mediaHandler::audioStatus,
         "sensors"       to mediaHandler::sensors,
+        // Communication
+        "sms"           to communicationHandler::sms,
+        "contacts"      to communicationHandler::contacts,
+        "notifications" to communicationHandler::notifications,
+        "clipboard"     to communicationHandler::clipboard,
+        // Files
+        "files"         to filesHandler::files,
+        "write_file"    to filesHandler::writeFile,
     )
 
     /**
