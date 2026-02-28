@@ -211,3 +211,32 @@ export async function connect(uid: string): Promise<string> {
   const { stdout, stderr } = await execFileAsync('adb', ['connect', target], { timeout: 60_000 });
   return (stdout + stderr).trim();
 }
+
+export async function openUrl(uid: string, url: string): Promise<string> {
+  return adb(uid, 'shell', 'am', 'start', '-a', 'android.intent.action.VIEW', '-d', url);
+}
+
+export async function sendSms(uid: string, phone: string, body: string): Promise<string> {
+  // Opens SMS composer with pre-filled recipient and body
+  return adb(uid, 'shell', 'am', 'start',
+    '-a', 'android.intent.action.SENDTO',
+    '-d', `sms:${phone}`,
+    '--es', 'sms_body', body,
+    '--ez', 'exit_on_sent', 'true',
+  );
+}
+
+export async function call(uid: string, phone: string): Promise<string> {
+  return adb(uid, 'shell', 'am', 'start', '-a', 'android.intent.action.CALL', '-d', `tel:${phone}`);
+}
+
+export async function screenOn(uid: string): Promise<string> {
+  // Wake up then dismiss keyguard
+  await adb(uid, 'shell', 'input', 'keyevent', 'KEYCODE_WAKEUP');
+  await adb(uid, 'shell', 'input', 'keyevent', 'KEYCODE_MENU');
+  return 'screen on';
+}
+
+export async function screenOff(uid: string): Promise<string> {
+  return adb(uid, 'shell', 'input', 'keyevent', 'KEYCODE_SLEEP');
+}

@@ -43,6 +43,11 @@ router.post('/:method', async (req: Request, res: Response) => {
       case 'screen_size':    result = await adb.getScreenSize(uid); break;
       case 'media_control':  result = await adb.mediaControl(uid, params.action); break;
       case 'connect':     result = await adb.connect(uid); break;
+      case 'open_url':    result = await adb.openUrl(uid, params.url); break;
+      case 'send_sms':    result = await adb.sendSms(uid, params.phone, params.body); break;
+      case 'call':        result = await adb.call(uid, params.phone); break;
+      case 'screen_on':   result = await adb.screenOn(uid); break;
+      case 'screen_off':  result = await adb.screenOff(uid); break;
       default:
         res.status(400).json({ error: `Unknown adb method: ${method}` });
         return;

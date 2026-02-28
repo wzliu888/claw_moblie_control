@@ -45,6 +45,20 @@ export const tools: Tool[] = [
     },
   },
   {
+    name: 'ringtone_mode',
+    description: 'Get or set the ringer mode. Modes: silent, vibrate, normal.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mode: {
+          type: 'string',
+          enum: ['silent', 'vibrate', 'normal'],
+          description: 'Ringer mode to set. Omit to get current mode.',
+        },
+      },
+    },
+  },
+  {
     name: 'media_control',
     description: 'Control media playback (play, pause, next track, etc.).',
     inputSchema: {

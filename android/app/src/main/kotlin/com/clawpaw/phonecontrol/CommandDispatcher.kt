@@ -36,6 +36,7 @@ class CommandDispatcher(context: Context) {
         "brightness"    to hardwareHandler::brightness,
         "flashlight"    to hardwareHandler::flashlight,
         "vibrate"       to hardwareHandler::vibrate,
+        "ringtone_mode" to hardwareHandler::ringtoneMode,
         // UI
         "screenshot"    to uiHandler::screenshot,
         "snapshot"      to uiHandler::snapshot,
