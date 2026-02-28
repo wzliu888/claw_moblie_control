@@ -169,27 +169,14 @@ export async function launchApp(uid: string, pkg: string): Promise<string> {
 }
 
 export async function listApps(uid: string): Promise<Array<{ packageName: string; label: string }>> {
+  // Use a single adb call — fetching labels per-app (pm dump) is O(N) round-trips and too slow.
   const raw = await adb(uid, 'shell', 'pm', 'list', 'packages', '-3');
-  const packages = raw
+  return raw
     .split('\n')
     .map(l => l.replace(/^package:/, '').trim())
     .filter(Boolean)
-    .sort();
-
-  // Fetch app labels in one dumpsys call — best effort, fall back to package name
-  const labels: Array<{ packageName: string; label: string }> = [];
-  for (const pkg of packages) {
-    let label = pkg;
-    try {
-      const out = await adb(uid, 'shell', 'pm', 'dump', pkg);
-      const m = out.match(/^\s+label=(.+)$/m);
-      if (m) label = m[1].trim();
-    } catch {
-      // ignore — use package name as label
-    }
-    labels.push({ packageName: pkg, label });
-  }
-  return labels;
+    .sort()
+    .map(pkg => ({ packageName: pkg, label: pkg }));
 }
 
 export async function getScreenSize(uid: string): Promise<{ width: number; height: number }> {
