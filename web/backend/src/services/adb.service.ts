@@ -79,8 +79,13 @@ async function adb(uid: string, ...args: string[]): Promise<string> {
 }
 
 export async function snapshot(uid: string): Promise<string> {
-  await adb(uid, 'shell', 'uiautomator', 'dump', '/sdcard/ui.xml');
-  return adb(uid, 'shell', 'cat', '/sdcard/ui.xml');
+  // Dump UI tree then strip rarely-needed attributes on-device to reduce transfer size.
+  // Keeps: text, content-desc, resource-id, bounds, class, clickable, scrollable, enabled
+  const stripAttrs = [
+    'index', 'package', 'checkable', 'checked', 'focusable', 'focused',
+    'selected', 'long-clickable', 'password', 'instance',
+  ].map(a => `s/ ${a}="[^"]*"//g`).join(';');
+  return adb(uid, 'shell', `uiautomator dump /sdcard/ui.xml && sed '${stripAttrs}' /sdcard/ui.xml`);
 }
 
 export async function tap(uid: string, x: number, y: number): Promise<string> {

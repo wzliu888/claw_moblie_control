@@ -10,6 +10,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.wifi.WifiManager
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
@@ -51,6 +52,7 @@ class WsService : Service() {
     private lateinit var dispatcher: CommandDispatcher
     private val sshTunnel = SshTunnelManager()
     private var wakeLock: PowerManager.WakeLock? = null
+    private var wifiLock: WifiManager.WifiLock? = null
     private var alarmManager: AlarmManager? = null
     private var keepalivePendingIntent: PendingIntent? = null
 
@@ -76,6 +78,9 @@ class WsService : Service() {
         autoEnableAccessibility()
         wakeLock = (getSystemService(POWER_SERVICE) as PowerManager)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ClawPaw::SshKeepAlive")
+            .also { it.acquire() }
+        wifiLock = (getSystemService(WIFI_SERVICE) as WifiManager)
+            .createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "ClawPaw::WifiKeepAlive")
             .also { it.acquire() }
         registerReceiver(keepaliveReceiver, IntentFilter(ACTION_KEEPALIVE),
             if (Build.VERSION.SDK_INT >= 33) RECEIVER_NOT_EXPORTED else 0)
@@ -163,6 +168,8 @@ class WsService : Service() {
         sshTunnel.stop()
         wakeLock?.release()
         wakeLock = null
+        wifiLock?.release()
+        wifiLock = null
         super.onDestroy()
     }
 
@@ -259,6 +266,20 @@ class WsService : Service() {
 
     fun sshState() = sshTunnel.state
     fun sshLastError() = sshTunnel.lastError
+
+    fun testSshConnectivity(): String {
+        val prefs = getSharedPreferences("ssh_config", MODE_PRIVATE)
+        val host = prefs.getString("host", "") ?: ""
+        if (host.isBlank()) return "SSH not configured"
+        val config = SshConfig(
+            host = host,
+            port = prefs.getInt("port", 22),
+            username = prefs.getString("username", "") ?: "",
+            password = prefs.getString("password", "") ?: "",
+            remoteAdbPort = prefs.getInt("adb_port", 9000),
+        )
+        return sshTunnel.testConnectivity(config)
+    }
 
     data class DebugInfo(
         val wsState: String,

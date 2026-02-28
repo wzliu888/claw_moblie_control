@@ -85,6 +85,47 @@ class SshTunnelManager {
         return s.isConnected
     }
 
+    /**
+     * Active SSH connectivity test — called from the debug panel.
+     * Returns a multi-line diagnostic string describing each check.
+     */
+    fun testConnectivity(config: SshConfig): String {
+        val sb = StringBuilder()
+
+        // 1. Check existing session
+        val s = session
+        if (s == null) {
+            sb.appendLine("Session: null (not started)")
+        } else {
+            sb.appendLine("Session.isConnected: ${s.isConnected}")
+            if (s.isConnected) {
+                val alive = try { s.sendKeepAliveMsg(); true } catch (e: Exception) { false }
+                sb.appendLine("sendKeepAliveMsg: ${if (alive) "ok" else "FAILED"}")
+            }
+        }
+
+        // 2. Try opening a fresh TCP+SSH connection (proves server port is reachable)
+        sb.appendLine("Probe new SSH session → ${config.host}:${config.port} ...")
+        try {
+            val jsch = JSch()
+            val probe = jsch.getSession(config.username, config.host, config.port).apply {
+                setPassword(config.password)
+                setConfig(Properties().apply {
+                    put("StrictHostKeyChecking", "no")
+                    put("ServerAliveInterval", "10")
+                    put("ServerAliveCountMax", "1")
+                })
+                connect(8_000)
+            }
+            sb.appendLine("New session: CONNECTED ✓")
+            try { probe.disconnect() } catch (_: Exception) {}
+        } catch (e: Exception) {
+            sb.appendLine("New session: FAILED — ${e.message}")
+        }
+
+        return sb.toString().trimEnd()
+    }
+
     private suspend fun connectWithRetry(config: SshConfig, onStateChange: ((State) -> Unit)?, onReleaseTunnel: (suspend () -> SshConfig)? = null) {
         var attempt = 0
         while (shouldReconnect) {

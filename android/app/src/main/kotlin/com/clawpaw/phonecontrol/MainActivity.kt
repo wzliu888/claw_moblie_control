@@ -558,6 +558,17 @@ class MainActivity : AppCompatActivity() {
             )
         })
 
+        // SSH test result area (hidden until button tapped)
+        val tvSshTest = TextView(this).apply {
+            typeface = android.graphics.Typeface.MONOSPACE
+            textSize = 11f
+            setTextColor(0xFFAAFFAA.toInt())
+            setTextIsSelectable(true)
+            visibility = View.GONE
+            setPadding(0, (8 * dp).toInt(), 0, 0)
+        }
+        root.addView(tvSshTest)
+
         val btnRow = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.END
@@ -574,6 +585,40 @@ class MainActivity : AppCompatActivity() {
             background = null
             isAllCaps = false
             setOnClickListener { dialog.dismiss() }
+        })
+
+        // Test SSH
+        btnRow.addView(Button(this).apply {
+            this.text = "Test SSH"
+            textSize = 13f
+            setTextColor(0xFFFFFFFF.toInt())
+            isAllCaps = false
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFF2255CC.toInt())
+                cornerRadius = 24 * dp
+            }
+            setPadding((20 * dp).toInt(), (8 * dp).toInt(), (20 * dp).toInt(), (8 * dp).toInt())
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            ).also { it.marginStart = (8 * dp).toInt() }
+            setOnClickListener {
+                tvSshTest.text = "Testing…"
+                tvSshTest.setTextColor(0xFFAAAAAA.toInt())
+                tvSshTest.visibility = View.VISIBLE
+                isEnabled = false
+                lifecycleScope.launch {
+                    val result = withContext(Dispatchers.IO) {
+                        wsService?.testSshConnectivity() ?: "Service not bound"
+                    }
+                    tvSshTest.text = result
+                    tvSshTest.setTextColor(
+                        if (result.contains("FAILED") || result.contains("null")) 0xFFFF6666.toInt()
+                        else 0xFF66FF99.toInt()
+                    )
+                    isEnabled = true
+                }
+            }
         })
 
         // Copy
