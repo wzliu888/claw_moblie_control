@@ -131,6 +131,7 @@ class SshTunnelManager {
                 delay(30_000L)
                 if (!isConnected()) {
                     Log.w(TAG, "Heartbeat failed — reconnecting")
+                    ConnectionLog.log("SSH", "heartbeat failed — reconnecting")
                     setState(State.CONNECTING, onStateChange)
                     disconnect()
                     connectWithRetry(config, onStateChange)
@@ -146,6 +147,7 @@ class SshTunnelManager {
     }
 
     private fun setState(s: State, onStateChange: ((State) -> Unit)?) {
+        ConnectionLog.log("SSH", if (s == State.ERROR) "ERROR: ${lastError ?: "unknown"}" else s.name)
         state = s
         onStateChange?.invoke(s)
     }

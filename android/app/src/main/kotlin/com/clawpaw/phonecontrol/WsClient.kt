@@ -66,6 +66,7 @@ class WsClient(
     }
 
     private fun setState(s: State) {
+        ConnectionLog.log("WS", s.name)
         state = s
         onStatusChange(s == State.CONNECTED)
     }
@@ -123,6 +124,7 @@ class WsClient(
             override fun onClosed(webSocket: okhttp3.WebSocket, code: Int, reason: String) {
                 Log.i(TAG, "WS closed code=$code reason=$reason")
                 ws = null
+                ConnectionLog.log("WS", "closed code=$code reason=$reason")
                 setState(State.DISCONNECTED)
                 if (shouldReconnect) scope?.launch { connectWithRetry() }
             }
@@ -133,6 +135,7 @@ class WsClient(
                 lastFailedAt = System.currentTimeMillis()
                 lastError = t.message
                 reconnectCount++
+                ConnectionLog.log("WS", "failure: ${t.message}")
                 setState(State.ERROR)
                 if (shouldReconnect) scope?.launch { connectWithRetry() }
             }

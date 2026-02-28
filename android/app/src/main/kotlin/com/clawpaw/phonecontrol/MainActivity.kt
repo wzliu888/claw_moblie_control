@@ -502,9 +502,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun showDebugDialog() {
         val info = wsService?.getDebugInfo()
+        val timeline = ConnectionLog.dump()
         val dp = resources.displayMetrics.density
 
-        val text = if (info == null) "Service not bound" else buildString {
+        val summary = if (info == null) "Service not bound\n" else buildString {
             appendLine("── WebSocket ──────────────")
             appendLine("State:       ${info.wsState}")
             appendLine("Reconnects:  ${info.wsReconnects}")
@@ -519,7 +520,14 @@ class MainActivity : AppCompatActivity() {
             appendLine("Last fail:   ${info.sshLastFailed}")
             appendLine("Last error:  ${info.sshLastError}")
             appendLine("Host:        ${info.sshHost}")
-            append("Remote port: ${info.sshRemotePort}")
+            appendLine("Remote port: ${info.sshRemotePort}")
+        }
+
+        val fullText = buildString {
+            append(summary)
+            appendLine()
+            appendLine("── Timeline ────────────────")
+            append(if (timeline.isBlank()) "(no events yet)" else timeline)
         }
 
         val root = android.widget.LinearLayout(this).apply {
@@ -538,7 +546,7 @@ class MainActivity : AppCompatActivity() {
 
         root.addView(ScrollView(this).apply {
             addView(TextView(this@MainActivity).apply {
-                this.text = text
+                this.text = fullText
                 typeface = android.graphics.Typeface.MONOSPACE
                 textSize = 11f
                 setTextColor(0xFFCCCCCC.toInt())
@@ -546,7 +554,7 @@ class MainActivity : AppCompatActivity() {
             })
             layoutParams = android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                (280 * dp).toInt()
+                (360 * dp).toInt()
             )
         })
 
@@ -558,6 +566,7 @@ class MainActivity : AppCompatActivity() {
 
         val dialog = AlertDialog.Builder(this).setView(root).create()
 
+        // Close
         btnRow.addView(Button(this).apply {
             this.text = "Close"
             textSize = 13f
@@ -565,6 +574,28 @@ class MainActivity : AppCompatActivity() {
             background = null
             isAllCaps = false
             setOnClickListener { dialog.dismiss() }
+        })
+
+        // Copy
+        btnRow.addView(Button(this).apply {
+            this.text = "Copy"
+            textSize = 13f
+            setTextColor(0xFFFFFFFF.toInt())
+            isAllCaps = false
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFFDC3232.toInt())
+                cornerRadius = 24 * dp
+            }
+            setPadding((20 * dp).toInt(), (8 * dp).toInt(), (20 * dp).toInt(), (8 * dp).toInt())
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            ).also { it.marginStart = (8 * dp).toInt() }
+            setOnClickListener {
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("ClawPaw Debug", fullText))
+                Toast.makeText(this@MainActivity, "Copied!", Toast.LENGTH_SHORT).show()
+            }
         })
 
         root.addView(btnRow)
