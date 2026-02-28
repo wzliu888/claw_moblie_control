@@ -165,6 +165,43 @@ class WsService : Service() {
     fun sshState() = sshTunnel.state
     fun sshLastError() = sshTunnel.lastError
 
+    data class DebugInfo(
+        val wsState: String,
+        val wsReconnects: Int,
+        val wsLastConnected: String,
+        val wsLastFailed: String,
+        val wsLastError: String,
+        val sshState: String,
+        val sshReconnects: Int,
+        val sshLastConnected: String,
+        val sshLastFailed: String,
+        val sshLastError: String,
+        val sshHost: String,
+        val sshRemotePort: Int,
+    )
+
+    fun getDebugInfo(): DebugInfo {
+        val prefs = getSharedPreferences("ssh_config", MODE_PRIVATE)
+        val fmt = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
+        fun ts(ms: Long) = if (ms == 0L) "—" else fmt.format(java.util.Date(ms))
+        val ws = wsClient
+        val ssh = sshTunnel
+        return DebugInfo(
+            wsState        = ws?.state?.name ?: "—",
+            wsReconnects   = ws?.reconnectCount ?: 0,
+            wsLastConnected = ts(ws?.lastConnectedAt ?: 0L),
+            wsLastFailed   = ts(ws?.lastFailedAt ?: 0L),
+            wsLastError    = ws?.lastError ?: "—",
+            sshState       = ssh.state.name,
+            sshReconnects  = ssh.reconnectCount,
+            sshLastConnected = ts(ssh.lastConnectedAt),
+            sshLastFailed  = ts(ssh.lastFailedAt),
+            sshLastError   = ssh.lastError ?: "—",
+            sshHost        = prefs.getString("host", "—") ?: "—",
+            sshRemotePort  = prefs.getInt("adb_port", 0),
+        )
+    }
+
     fun saveSshConfig(host: String, port: Int) {
         val prefs = getSharedPreferences("ssh_config", MODE_PRIVATE)
         prefs.edit().apply {

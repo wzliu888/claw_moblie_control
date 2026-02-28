@@ -34,6 +34,12 @@ class SshTunnelManager {
 
     @Volatile var lastError: String? = null
         private set
+    @Volatile var reconnectCount: Int = 0
+        private set
+    @Volatile var lastConnectedAt: Long = 0L
+        private set
+    @Volatile var lastFailedAt: Long = 0L
+        private set
 
     private var session: Session? = null
     private var heartbeatJob: Job? = null
@@ -106,8 +112,12 @@ class SshTunnelManager {
             }
             session = s
             lastError = null
+            lastConnectedAt = System.currentTimeMillis()
             setState(State.CONNECTED, onStateChange)
         } catch (e: Exception) {
+            lastError = e.message
+            lastFailedAt = System.currentTimeMillis()
+            reconnectCount++
             setState(State.ERROR, onStateChange)
             disconnect()
             throw e

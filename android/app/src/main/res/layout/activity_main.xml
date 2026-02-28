@@ -377,16 +377,31 @@
 
             </LinearLayout>
 
-            <!-- Sign Out at bottom -->
-            <Button
-                android:id="@+id/btnLogout"
-                android:layout_width="wrap_content"
+            <!-- Bottom row: Debug + Sign Out -->
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginTop="64dp"
-                android:text="Sign Out"
-                android:textColor="@color/text_secondary"
-                style="@style/Widget.AppCompat.Button.Borderless" />
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:layout_marginTop="64dp">
+
+                <Button
+                    android:id="@+id/btnDebug"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Debug"
+                    android:textColor="@color/text_secondary"
+                    style="@style/Widget.AppCompat.Button.Borderless" />
+
+                <Button
+                    android:id="@+id/btnLogout"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Sign Out"
+                    android:textColor="@color/text_secondary"
+                    style="@style/Widget.AppCompat.Button.Borderless" />
+
+            </LinearLayout>
 
         </LinearLayout>
 

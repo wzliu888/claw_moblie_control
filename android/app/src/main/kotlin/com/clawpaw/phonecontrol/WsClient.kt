@@ -31,6 +31,14 @@ class WsClient(
 
     @Volatile var state: State = State.DISCONNECTED
         private set
+    @Volatile var reconnectCount: Int = 0
+        private set
+    @Volatile var lastConnectedAt: Long = 0L
+        private set
+    @Volatile var lastFailedAt: Long = 0L
+        private set
+    @Volatile var lastError: String? = null
+        private set
 
     private val client = OkHttpClient.Builder()
         .pingInterval(0, TimeUnit.SECONDS)  // disable OkHttp ping — server handles heartbeat
@@ -90,6 +98,7 @@ class WsClient(
         ws = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: okhttp3.WebSocket, response: Response) {
                 Log.i(TAG, "WS connected uid=$uid")
+                lastConnectedAt = System.currentTimeMillis()
                 setState(State.CONNECTED)
             }
 
@@ -121,6 +130,9 @@ class WsClient(
             override fun onFailure(webSocket: okhttp3.WebSocket, t: Throwable, response: Response?) {
                 Log.e(TAG, "WS failure: ${t.message}")
                 ws = null
+                lastFailedAt = System.currentTimeMillis()
+                lastError = t.message
+                reconnectCount++
                 setState(State.ERROR)
                 if (shouldReconnect) scope?.launch { connectWithRetry() }
             }

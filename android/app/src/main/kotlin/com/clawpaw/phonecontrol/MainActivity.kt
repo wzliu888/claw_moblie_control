@@ -276,6 +276,11 @@ class MainActivity : AppCompatActivity() {
                 .show()
         }
 
+        // Debug info
+        findViewById<Button>(R.id.btnDebug).setOnClickListener {
+            showDebugDialog()
+        }
+
         // Logout
         findViewById<Button>(R.id.btnLogout).setOnClickListener {
             logout()
@@ -493,5 +498,92 @@ class MainActivity : AppCompatActivity() {
             tv.text = "Reconnecting…"
             btn.visibility = View.GONE
         }
+    }
+
+    private fun showDebugDialog() {
+        val info = wsService?.getDebugInfo()
+        val dp = resources.displayMetrics.density
+
+        val text = if (info == null) "Service not bound" else buildString {
+            appendLine("── WebSocket ──────────────")
+            appendLine("State:       ${info.wsState}")
+            appendLine("Reconnects:  ${info.wsReconnects}")
+            appendLine("Connected:   ${info.wsLastConnected}")
+            appendLine("Last fail:   ${info.wsLastFailed}")
+            appendLine("Last error:  ${info.wsLastError}")
+            appendLine()
+            appendLine("── SSH Tunnel ──────────────")
+            appendLine("State:       ${info.sshState}")
+            appendLine("Reconnects:  ${info.sshReconnects}")
+            appendLine("Connected:   ${info.sshLastConnected}")
+            appendLine("Last fail:   ${info.sshLastFailed}")
+            appendLine("Last error:  ${info.sshLastError}")
+            appendLine("Host:        ${info.sshHost}")
+            append("Remote port: ${info.sshRemotePort}")
+        }
+
+        val root = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setBackgroundColor(0xFF131318.toInt())
+            setPadding((24 * dp).toInt(), (24 * dp).toInt(), (24 * dp).toInt(), (20 * dp).toInt())
+        }
+
+        root.addView(TextView(this).apply {
+            this.text = "Debug Info"
+            textSize = 16f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(0, 0, 0, (16 * dp).toInt())
+        })
+
+        root.addView(ScrollView(this).apply {
+            addView(TextView(this@MainActivity).apply {
+                this.text = text
+                typeface = android.graphics.Typeface.MONOSPACE
+                textSize = 11f
+                setTextColor(0xFFCCCCCC.toInt())
+                setTextIsSelectable(true)
+            })
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                (280 * dp).toInt()
+            )
+        })
+
+        val btnRow = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.END
+            setPadding(0, (16 * dp).toInt(), 0, 0)
+        }
+
+        val dialog = AlertDialog.Builder(this).setView(root).create()
+
+        btnRow.addView(Button(this).apply {
+            this.text = "Close"
+            textSize = 13f
+            setTextColor(0xFF666666.toInt())
+            background = null
+            isAllCaps = false
+            setOnClickListener { dialog.dismiss() }
+        })
+
+        root.addView(btnRow)
+
+        dialog.window?.apply {
+            setBackgroundDrawable(android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFF131318.toInt())
+                cornerRadius = 20 * dp
+            })
+            val params = attributes
+            params.width = (resources.displayMetrics.widthPixels * 0.92).toInt()
+            attributes = params
+        }
+
+        dialog.show()
+
+        dialog.window?.setBackgroundDrawable(android.graphics.drawable.GradientDrawable().apply {
+            setColor(0xFF131318.toInt())
+            cornerRadius = 20 * dp
+        })
     }
 }
