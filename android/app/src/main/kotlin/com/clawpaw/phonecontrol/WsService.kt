@@ -78,6 +78,13 @@ class WsService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Handle reconnect_ssh action triggered by CommandDispatcher
+        if (intent?.action == "com.clawpaw.ACTION_RECONNECT_SSH") {
+            Log.i(TAG, "Received ACTION_RECONNECT_SSH — reconnecting SSH tunnel")
+            reconnectSsh()
+            return START_NOT_STICKY
+        }
+
         val uid = intent?.getStringExtra("uid") ?: run {
             Log.e(TAG, "Started without uid, stopping")
             stopSelf()

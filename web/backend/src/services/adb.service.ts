@@ -1,6 +1,7 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { SshCredentialRepository } from '../repositories/ssh_credential.repository';
+import { forwardRpc } from '../ws/wsServer';
 
 const execFileAsync = promisify(execFile);
 
@@ -17,7 +18,7 @@ async function deviceTarget(uid: string): Promise<string> {
   return `${SSH_HOST_IP}:${cred.adb_port}`;
 }
 
-async function reconnect(target: string): Promise<void> {
+async function reconnect(uid: string, target: string): Promise<void> {
   console.log(`[adb] reconnecting target=${target}`);
   try {
     const { stdout: dcOut } = await execFileAsync('adb', ['disconnect', target], { timeout: 60_000 });
@@ -27,9 +28,26 @@ async function reconnect(target: string): Promise<void> {
   }
   try {
     const { stdout: connOut } = await execFileAsync('adb', ['connect', target], { timeout: 60_000 });
-    console.log(`[adb] connect → ${connOut.trim()}`);
+    const out = connOut.trim();
+    console.log(`[adb] connect → ${out}`);
+    // If adb connect succeeded, we're done
+    if (!out.includes('failed') && !out.includes('offline')) return;
   } catch (e: any) {
-    console.error(`[adb] connect FAILED: ${e.stderr?.trim() || e.message}`);
+    console.warn(`[adb] connect failed: ${e.stderr?.trim() || e.message} — asking phone to rebuild SSH tunnel`);
+  }
+
+  // adb connect failed → SSH tunnel is down. Ask the phone (via WS) to reconnect.
+  console.log(`[adb] triggering SSH tunnel rebuild for uid=${uid}`);
+  await forwardRpc(uid, 'reconnect_ssh', {});
+
+  // Give the phone time to re-establish the tunnel before retrying adb connect
+  await new Promise(r => setTimeout(r, 8_000));
+
+  try {
+    const { stdout } = await execFileAsync('adb', ['connect', target], { timeout: 60_000 });
+    console.log(`[adb] connect after SSH rebuild → ${stdout.trim()}`);
+  } catch (e: any) {
+    console.error(`[adb] connect still FAILED after SSH rebuild: ${e.stderr?.trim() || e.message}`);
   }
 }
 
@@ -53,7 +71,7 @@ async function adb(uid: string, ...args: string[]): Promise<string> {
     console.warn(`[adb] ${cmd} → failed (${elapsed}ms) code=${e.code} signal=${e.signal}${detail ? '\n' + detail : ''} — reconnecting`);
 
     // Reconnect and retry once
-    await reconnect(target);
+    await reconnect(uid, target);
     try {
       const { stdout: s2, stderr: e2 } = await run();
       console.log(`[adb] ${cmd} → ok after reconnect (${Date.now() - t0}ms)`);
@@ -139,7 +157,7 @@ export async function screenshot(uid: string): Promise<{ data: string; mimeType:
     return await attempt('');
   } catch (e: any) {
     console.warn(`[screenshot] failed code=${e.code} signal=${e.signal} — reconnecting`);
-    await reconnect(target);
+    await reconnect(uid, target);
     try {
       return await attempt(' (after reconnect)');
     } catch (e2: any) {
