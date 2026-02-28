@@ -1,19 +1,32 @@
 package com.clawpaw.phonecontrol
 
+import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Binder
+import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 
 private const val TAG = "WsService"
 private const val CHANNEL_ID = "clawpaw_ws"
 private const val NOTIF_ID = 1
+private const val ACTION_KEEPALIVE = "com.clawpaw.ACTION_KEEPALIVE"
+private const val KEEPALIVE_INTERVAL_MS = 15_000L
 
 /**
  * Foreground Service — keeps the WebSocket connection alive even when
@@ -38,6 +51,21 @@ class WsService : Service() {
     private lateinit var dispatcher: CommandDispatcher
     private val sshTunnel = SshTunnelManager()
     private var wakeLock: PowerManager.WakeLock? = null
+    private var alarmManager: AlarmManager? = null
+    private var keepalivePendingIntent: PendingIntent? = null
+
+    private val keepaliveReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action != ACTION_KEEPALIVE) return
+            // Re-acquire WakeLock briefly so the SSH heartbeat coroutine gets CPU time
+            val wl = (getSystemService(POWER_SERVICE) as PowerManager)
+                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ClawPaw::KeepaliveAlarm")
+            wl.acquire(10_000L)
+            Log.d(TAG, "Keepalive alarm fired — SSH state=${sshTunnel.state}")
+            wl.release()
+            scheduleNextKeepaliveAlarm()
+        }
+    }
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -49,6 +77,10 @@ class WsService : Service() {
         wakeLock = (getSystemService(POWER_SERVICE) as PowerManager)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ClawPaw::SshKeepAlive")
             .also { it.acquire() }
+        registerReceiver(keepaliveReceiver, IntentFilter(ACTION_KEEPALIVE),
+            if (Build.VERSION.SDK_INT >= 33) RECEIVER_NOT_EXPORTED else 0)
+        alarmManager = getSystemService(AlarmManager::class.java)
+        scheduleNextKeepaliveAlarm()
     }
 
     /**
@@ -111,10 +143,12 @@ class WsService : Service() {
                 password = prefs.getString("password", "") ?: "",
                 remoteAdbPort = prefs.getInt("adb_port", 9000),
             )
-            sshTunnel.start(config) { state ->
+            sshTunnel.start(config, onStateChange = { state ->
                 Log.i(TAG, "SSH tunnel state: $state")
                 sshStatusListener?.invoke(state)
-            }
+            }, onReleaseTunnel = {
+                releaseTunnelOnBackend()
+            })
             Log.i(TAG, "SSH tunnel started → ${config.host}:${config.remoteAdbPort}")
         }
 
@@ -124,12 +158,28 @@ class WsService : Service() {
     override fun onBind(intent: Intent): IBinder = binder
 
     override fun onDestroy() {
+        keepalivePendingIntent?.let { alarmManager?.cancel(it) }
+        try { unregisterReceiver(keepaliveReceiver) } catch (_: Exception) {}
         wsClient?.disconnect()
         wsClient = null
         sshTunnel.stop()
         wakeLock?.release()
         wakeLock = null
         super.onDestroy()
+    }
+
+    // ── Doze-proof keepalive alarm ───────────────────────────────────────────
+
+    private fun scheduleNextKeepaliveAlarm() {
+        val intent = Intent(ACTION_KEEPALIVE).setPackage(packageName)
+        val pi = PendingIntent.getBroadcast(
+            this, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        keepalivePendingIntent = pi
+        val triggerAt = System.currentTimeMillis() + KEEPALIVE_INTERVAL_MS
+        // setExactAndAllowWhileIdle fires even in Doze mode
+        alarmManager?.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
     }
 
     // ── Public API (used by bound Activity) ─────────────────────────────────
@@ -144,6 +194,37 @@ class WsService : Service() {
         wsClient?.connect()
     }
 
+    /** POST /api/adb/release_tunnel to tell the backend to disconnect its adb session,
+     *  freeing the port so the new SSH tunnel can bind it. */
+    private fun releaseTunnelOnBackend() {
+        val prefs = getSharedPreferences("ssh_config", MODE_PRIVATE)
+        val uid = prefs.getString("uid", "") ?: return
+        val secret = prefs.getString("secret", "") ?: return
+        if (uid.isBlank() || secret.isBlank()) return
+
+        val httpBaseUrl = BuildConfig.WS_URL
+            .replace(Regex("^wss://"), "https://")
+            .replace(Regex("^ws://"), "http://")
+
+        val body = JSONObject().apply { put("uid", uid) }
+            .toString()
+            .toRequestBody("application/json".toMediaType())
+
+        val request = Request.Builder()
+            .url("$httpBaseUrl/api/adb/release_tunnel")
+            .header("x-clawpaw-secret", secret)
+            .post(body)
+            .build()
+
+        try {
+            OkHttpClient().newCall(request).execute().use { resp ->
+                Log.i(TAG, "releaseTunnel → HTTP ${resp.code}")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "releaseTunnel HTTP failed: ${e.message}")
+        }
+    }
+
     fun reconnectSsh() {
         val prefs = getSharedPreferences("ssh_config", MODE_PRIVATE)
         val host = prefs.getString("host", "") ?: ""
@@ -156,9 +237,11 @@ class WsService : Service() {
                 password = prefs.getString("password", "") ?: "",
                 remoteAdbPort = prefs.getInt("adb_port", 9000),
             )
-            sshTunnel.start(config) { state ->
+            sshTunnel.start(config, onStateChange = { state ->
                 sshStatusListener?.invoke(state)
-            }
+            }, onReleaseTunnel = {
+                releaseTunnelOnBackend()
+            })
         }
     }
 
@@ -219,10 +302,12 @@ class WsService : Service() {
                 password = prefs.getString("password", "") ?: "",
                 remoteAdbPort = prefs.getInt("adb_port", 9000),
             )
-            sshTunnel.start(config) { state ->
+            sshTunnel.start(config, onStateChange = { state ->
                 Log.i(TAG, "SSH tunnel state: $state")
                 sshStatusListener?.invoke(state)
-            }
+            }, onReleaseTunnel = {
+                releaseTunnelOnBackend()
+            })
         }
     }
 

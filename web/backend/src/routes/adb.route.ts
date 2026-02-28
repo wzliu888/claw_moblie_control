@@ -47,7 +47,8 @@ router.post('/:method', async (req: Request, res: Response) => {
       case 'send_sms':    result = await adb.sendSms(uid, params.phone, params.body); break;
       case 'call':        result = await adb.call(uid, params.phone); break;
       case 'screen_on':   result = await adb.screenOn(uid); break;
-      case 'screen_off':  result = await adb.screenOff(uid); break;
+      case 'screen_off':      result = await adb.screenOff(uid); break;
+      case 'release_tunnel':  result = await adb.releaseTunnel(uid); break;
       default:
         res.status(400).json({ error: `Unknown adb method: ${method}` });
         return;

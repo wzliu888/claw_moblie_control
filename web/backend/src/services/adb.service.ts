@@ -230,6 +230,20 @@ export async function connect(uid: string): Promise<string> {
   return (stdout + stderr).trim();
 }
 
+export async function releaseTunnel(uid: string): Promise<string> {
+  const target = await deviceTarget(uid);
+  console.log(`[adb] releaseTunnel uid=${uid} target=${target}`);
+  try {
+    const { stdout, stderr } = await execFileAsync('adb', ['disconnect', target], { timeout: 10_000 });
+    const out = (stdout + stderr).trim();
+    console.log(`[adb] releaseTunnel disconnect → ${out}`);
+    return out;
+  } catch (e: any) {
+    console.warn(`[adb] releaseTunnel disconnect failed: ${e.message}`);
+    return `disconnect failed: ${e.message}`;
+  }
+}
+
 export async function openUrl(uid: string, url: string): Promise<string> {
   return adb(uid, 'shell', 'am', 'start', '-a', 'android.intent.action.VIEW', '-d', url);
 }
