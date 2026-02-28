@@ -75,31 +75,21 @@ class SshTunnelManager {
         return try { s.sendKeepAliveMsg(); true } catch (e: Exception) { false }
     }
 
-    /** Run `echo alive` via an SSH exec channel to prove the session AND the tunnel are healthy.
-     *  This catches half-open TCP connections that JSch's keepalive misses. */
-    fun isTunnelAliveViaSsh(): Boolean {
+    /** Probe SSH session liveness.
+     *  Relies on JSch's built-in ServerAliveInterval (set to 10s) which sends SSH keepalive
+     *  packets and disconnects the session after ServerAliveCountMax failures.
+     *  So session.isConnected==false reliably means the TCP path is dead.
+     *  Does NOT require shell access — works with /bin/false users. */
+    fun isTunnelAliveViaSsh(serverHost: String, serverSshPort: Int = 22): Boolean {
         val s = session ?: return false
-        return try {
-            val ch = s.openChannel("exec") as com.jcraft.jsch.ChannelExec
-            ch.setCommand("echo alive")
-            val stdout = ch.inputStream   // capture before connect
-            ch.connect(5_000)
-            val buf = stdout.readBytes()
-            ch.disconnect()
-            val out = buf.toString(Charsets.UTF_8).trim()
-            (out == "alive").also { ok ->
-                if (!ok) Log.w(TAG, "SSH exec probe unexpected output: '$out'")
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "SSH exec probe failed — ${e.message}")
-            false
-        }
+        return s.isConnected
     }
 
     private suspend fun connectWithRetry(config: SshConfig, onStateChange: ((State) -> Unit)?, onReleaseTunnel: (suspend () -> Unit)? = null) {
         var attempt = 0
         while (shouldReconnect) {
             try {
+                ConnectionLog.log("SSH", "connect attempt ${attempt + 1} → ${config.host}:${config.port}")
                 connect(config, onStateChange)
                 // connected — start heartbeat and wait
                 attempt = 0
@@ -107,12 +97,14 @@ class SshTunnelManager {
                 return
             } catch (e: Exception) {
                 Log.e(TAG, "Attempt ${attempt + 1} failed: ${e.message}")
+                ConnectionLog.log("SSH", "attempt ${attempt + 1} FAILED: ${e.message}")
                 lastError = e.message
             }
             attempt++
             if (shouldReconnect) {
                 val delayMs = (500L * 1.5.pow(attempt - 1).toLong()).coerceAtMost(10_000L)
                 Log.d(TAG, "Retry in ${delayMs}ms")
+                ConnectionLog.log("SSH", "retry in ${delayMs}ms")
                 setState(State.CONNECTING, onStateChange)
                 delay(delayMs)
             }
@@ -138,6 +130,7 @@ class SshTunnelManager {
             session = s
             lastError = null
             lastConnectedAt = System.currentTimeMillis()
+            ConnectionLog.log("SSH", "tunnel up → ${config.host}:${config.remoteAdbPort}")
             setState(State.CONNECTED, onStateChange)
         } catch (e: Exception) {
             lastError = e.message
@@ -156,26 +149,34 @@ class SshTunnelManager {
     ) {
         heartbeatJob?.cancel()
         heartbeatJob = scope!!.launch {
+            var probeCount = 0
             while (isActive && shouldReconnect) {
                 delay(20_000L)
-                if (!isTunnelAliveViaSsh()) {
-                    Log.w(TAG, "SSH probe failed — releasing tunnel and reconnecting")
-                    ConnectionLog.log("SSH", "probe failed — releasing tunnel")
+                probeCount++
+                Log.d(TAG, "Heartbeat probe #$probeCount")
+                ConnectionLog.log("SSH", "probe #$probeCount")
+                val alive = isTunnelAliveViaSsh(config.host, config.port)
+                if (!alive) {
+                    Log.w(TAG, "SSH probe #$probeCount FAILED — releasing tunnel and reconnecting")
+                    ConnectionLog.log("SSH", "probe #$probeCount FAILED — releasing port")
                     setState(State.CONNECTING, onStateChange)
                     disconnect()
                     // Ask backend to release the port (adb disconnect) so the new tunnel can bind it
                     try {
                         onReleaseTunnel?.invoke()
                         Log.i(TAG, "Backend port release triggered")
+                        ConnectionLog.log("SSH", "backend release_tunnel sent")
                     } catch (e: Exception) {
                         Log.w(TAG, "Backend port release failed: ${e.message}")
+                        ConnectionLog.log("SSH", "backend release_tunnel FAILED: ${e.message}")
                     }
-                    // Brief pause so sshd has time to reclaim the port
-                    delay(2_000L)
+                    // Brief pause so sshd has time to reclaim the port after fuser kill
+                    delay(3_000L)
                     connectWithRetry(config, onStateChange, onReleaseTunnel)
                     return@launch
                 }
-                Log.d(TAG, "SSH probe ok")
+                Log.d(TAG, "SSH probe #$probeCount ok")
+                ConnectionLog.log("SSH", "probe #$probeCount ok")
             }
         }
     }

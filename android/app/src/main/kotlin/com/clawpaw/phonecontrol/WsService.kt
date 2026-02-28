@@ -219,9 +219,11 @@ class WsService : Service() {
         try {
             OkHttpClient().newCall(request).execute().use { resp ->
                 Log.i(TAG, "releaseTunnel → HTTP ${resp.code}")
+                ConnectionLog.log("WS", "releaseTunnel HTTP ${resp.code}")
             }
         } catch (e: Exception) {
             Log.w(TAG, "releaseTunnel HTTP failed: ${e.message}")
+            ConnectionLog.log("WS", "releaseTunnel HTTP FAILED: ${e.message}")
         }
     }
 

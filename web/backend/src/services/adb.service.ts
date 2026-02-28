@@ -231,17 +231,32 @@ export async function connect(uid: string): Promise<string> {
 }
 
 export async function releaseTunnel(uid: string): Promise<string> {
-  const target = await deviceTarget(uid);
-  console.log(`[adb] releaseTunnel uid=${uid} target=${target}`);
+  const cred = await repo.findByUid(uid);
+  if (!cred) throw new Error(`No SSH credentials for uid=${uid}`);
+  const adbPort = cred.adb_port;
+  const target = `${SSH_HOST_IP}:${adbPort}`;
+  console.log(`[releaseTunnel] uid=${uid} port=${adbPort}`);
+
+  // 1. adb disconnect so the backend releases its adb connection
   try {
     const { stdout, stderr } = await execFileAsync('adb', ['disconnect', target], { timeout: 10_000 });
-    const out = (stdout + stderr).trim();
-    console.log(`[adb] releaseTunnel disconnect → ${out}`);
-    return out;
+    console.log(`[releaseTunnel] adb disconnect → ${(stdout + stderr).trim()}`);
   } catch (e: any) {
-    console.warn(`[adb] releaseTunnel disconnect failed: ${e.message}`);
-    return `disconnect failed: ${e.message}`;
+    console.warn(`[releaseTunnel] adb disconnect failed: ${e.message}`);
   }
+
+  // 2. Kill the sshd process that holds the reverse-tunnel port so the next
+  //    connection can bind it immediately (without waiting for ClientAliveInterval).
+  //    `fuser -k <port>/tcp` sends SIGKILL to the owning process.
+  try {
+    await execFileAsync('fuser', ['-k', `${adbPort}/tcp`], { timeout: 5_000 });
+    console.log(`[releaseTunnel] fuser killed port ${adbPort}`);
+  } catch (e: any) {
+    // fuser exits non-zero when no process owns the port — that's fine
+    console.log(`[releaseTunnel] fuser: ${e.message ?? e}`);
+  }
+
+  return `released port ${adbPort}`;
 }
 
 export async function openUrl(uid: string, url: string): Promise<string> {
