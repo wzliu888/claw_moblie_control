@@ -19,14 +19,24 @@ CREATE TABLE IF NOT EXISTS clawpaw_secrets (
 -- SSH reverse tunnel credentials.
 -- All users share the Linux user 'cp_shared' on the tunnel node.
 -- Each user gets a unique adb_port in [10000, 19999] for their reverse tunnel.
+-- adb_port_slot (0 or 1) selects the active port: slot 0 → adb_port, slot 1 → adb_port + 10000.
+-- On each reconnect the slot is flipped so the new tunnel binds a fresh port while the old sshd
+-- session still holds the previous one (avoids "remote port forwarding failed" races).
 -- password is used by the Android app to authenticate to the SSH server.
 CREATE TABLE IF NOT EXISTS ssh_credentials (
   uid            CHAR(36)     NOT NULL COMMENT 'references users.uid',
   linux_user     VARCHAR(32)  NOT NULL DEFAULT 'cp_shared',
   linux_password VARCHAR(64)  NOT NULL COMMENT 'SSH password for cp_shared (shared secret)',
-  adb_port       INT          NOT NULL COMMENT 'unique port in [10000, 19999]',
+  adb_port       INT          NOT NULL COMMENT 'base port in [10000, 19999]',
+  adb_port_slot  TINYINT      NOT NULL DEFAULT 0 COMMENT '0 or 1; active port = adb_port + slot * 10000',
   created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (uid),
   UNIQUE KEY uq_adb_port (adb_port)
 );
+
+-- Migration: add adb_port_slot to existing tables
+ALTER TABLE ssh_credentials
+  ADD COLUMN IF NOT EXISTS adb_port_slot TINYINT NOT NULL DEFAULT 0
+    COMMENT '0 or 1; active port = adb_port + slot * 10000'
+  AFTER adb_port;

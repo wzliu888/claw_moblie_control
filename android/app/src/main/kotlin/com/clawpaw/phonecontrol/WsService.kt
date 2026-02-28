@@ -146,9 +146,7 @@ class WsService : Service() {
             sshTunnel.start(config, onStateChange = { state ->
                 Log.i(TAG, "SSH tunnel state: $state")
                 sshStatusListener?.invoke(state)
-            }, onReleaseTunnel = {
-                releaseTunnelOnBackend()
-            })
+            }, onReleaseTunnel = { releaseTunnelOnBackend() })
             Log.i(TAG, "SSH tunnel started → ${config.host}:${config.remoteAdbPort}")
         }
 
@@ -194,13 +192,16 @@ class WsService : Service() {
         wsClient?.connect()
     }
 
-    /** POST /api/adb/release_tunnel to tell the backend to disconnect its adb session,
-     *  freeing the port so the new SSH tunnel can bind it. */
-    private fun releaseTunnelOnBackend() {
+    /**
+     * POST /api/adb/release_tunnel — backend disconnects its adb session, flips the port slot,
+     * and returns { newPort }. We save the new port to shared prefs and return an updated SshConfig.
+     * Throws on HTTP error so the caller (heartbeat) can fall back to the old port.
+     */
+    private fun releaseTunnelOnBackend(): SshConfig {
         val prefs = getSharedPreferences("ssh_config", MODE_PRIVATE)
-        val uid = prefs.getString("uid", "") ?: return
-        val secret = prefs.getString("secret", "") ?: return
-        if (uid.isBlank() || secret.isBlank()) return
+        val uid = prefs.getString("uid", "") ?: throw IllegalStateException("no uid")
+        val secret = prefs.getString("secret", "") ?: throw IllegalStateException("no secret")
+        if (uid.isBlank() || secret.isBlank()) throw IllegalStateException("uid/secret blank")
 
         val httpBaseUrl = BuildConfig.WS_URL
             .replace(Regex("^wss://"), "https://")
@@ -216,14 +217,25 @@ class WsService : Service() {
             .post(body)
             .build()
 
-        try {
-            OkHttpClient().newCall(request).execute().use { resp ->
-                Log.i(TAG, "releaseTunnel → HTTP ${resp.code}")
-                ConnectionLog.log("WS", "releaseTunnel HTTP ${resp.code}")
+        OkHttpClient().newCall(request).execute().use { resp ->
+            Log.i(TAG, "releaseTunnel → HTTP ${resp.code}")
+            ConnectionLog.log("WS", "releaseTunnel HTTP ${resp.code}")
+            if (!resp.isSuccessful) throw RuntimeException("HTTP ${resp.code}")
+
+            val json = JSONObject(resp.body?.string() ?: "{}")
+            val newPort = json.optJSONObject("data")?.optInt("newPort", 0) ?: 0
+            if (newPort > 0) {
+                prefs.edit().putInt("adb_port", newPort).apply()
+                ConnectionLog.log("WS", "releaseTunnel newPort=$newPort saved")
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "releaseTunnel HTTP failed: ${e.message}")
-            ConnectionLog.log("WS", "releaseTunnel HTTP FAILED: ${e.message}")
+
+            return SshConfig(
+                host = prefs.getString("host", "") ?: "",
+                port = prefs.getInt("port", 22),
+                username = prefs.getString("username", "") ?: "",
+                password = prefs.getString("password", "") ?: "",
+                remoteAdbPort = if (newPort > 0) newPort else prefs.getInt("adb_port", 9000),
+            )
         }
     }
 
@@ -241,9 +253,7 @@ class WsService : Service() {
             )
             sshTunnel.start(config, onStateChange = { state ->
                 sshStatusListener?.invoke(state)
-            }, onReleaseTunnel = {
-                releaseTunnelOnBackend()
-            })
+            }, onReleaseTunnel = { releaseTunnelOnBackend() })
         }
     }
 
@@ -307,9 +317,7 @@ class WsService : Service() {
             sshTunnel.start(config, onStateChange = { state ->
                 Log.i(TAG, "SSH tunnel state: $state")
                 sshStatusListener?.invoke(state)
-            }, onReleaseTunnel = {
-                releaseTunnelOnBackend()
-            })
+            }, onReleaseTunnel = { releaseTunnelOnBackend() })
         }
     }
 

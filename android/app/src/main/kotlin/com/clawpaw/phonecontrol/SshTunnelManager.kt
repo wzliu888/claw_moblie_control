@@ -50,7 +50,7 @@ class SshTunnelManager {
     fun start(
         config: SshConfig,
         onStateChange: ((State) -> Unit)? = null,
-        onReleaseTunnel: (suspend () -> Unit)? = null,
+        onReleaseTunnel: (suspend () -> SshConfig)? = null,
     ) {
         shouldReconnect = true
         scope?.cancel()
@@ -85,7 +85,7 @@ class SshTunnelManager {
         return s.isConnected
     }
 
-    private suspend fun connectWithRetry(config: SshConfig, onStateChange: ((State) -> Unit)?, onReleaseTunnel: (suspend () -> Unit)? = null) {
+    private suspend fun connectWithRetry(config: SshConfig, onStateChange: ((State) -> Unit)?, onReleaseTunnel: (suspend () -> SshConfig)? = null) {
         var attempt = 0
         while (shouldReconnect) {
             try {
@@ -145,7 +145,7 @@ class SshTunnelManager {
     private fun startHeartbeat(
         config: SshConfig,
         onStateChange: ((State) -> Unit)?,
-        onReleaseTunnel: (suspend () -> Unit)? = null,
+        onReleaseTunnel: (suspend () -> SshConfig)? = null,
     ) {
         heartbeatJob?.cancel()
         heartbeatJob = scope!!.launch {
@@ -161,18 +161,17 @@ class SshTunnelManager {
                     ConnectionLog.log("SSH", "probe #$probeCount FAILED — releasing port")
                     setState(State.CONNECTING, onStateChange)
                     disconnect()
-                    // Ask backend to release the port (adb disconnect) so the new tunnel can bind it
-                    try {
-                        onReleaseTunnel?.invoke()
-                        Log.i(TAG, "Backend port release triggered")
-                        ConnectionLog.log("SSH", "backend release_tunnel sent")
+                    // Ask backend to release the old port and get the new port to use
+                    val nextConfig = try {
+                        val c = onReleaseTunnel?.invoke() ?: config
+                        ConnectionLog.log("SSH", "backend release_tunnel → newPort=${c.remoteAdbPort}")
+                        c
                     } catch (e: Exception) {
                         Log.w(TAG, "Backend port release failed: ${e.message}")
-                        ConnectionLog.log("SSH", "backend release_tunnel FAILED: ${e.message}")
+                        ConnectionLog.log("SSH", "backend release_tunnel FAILED: ${e.message} — reusing old port")
+                        config
                     }
-                    // Brief pause so sshd has time to reclaim the port after fuser kill
-                    delay(3_000L)
-                    connectWithRetry(config, onStateChange, onReleaseTunnel)
+                    connectWithRetry(nextConfig, onStateChange, onReleaseTunnel)
                     return@launch
                 }
                 Log.d(TAG, "SSH probe #$probeCount ok")

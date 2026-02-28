@@ -1,6 +1,6 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { SshCredentialRepository } from '../repositories/ssh_credential.repository';
+import { SshCredentialRepository, activePort } from '../repositories/ssh_credential.repository';
 import { forwardRpc } from '../ws/wsServer';
 
 const execFileAsync = promisify(execFile);
@@ -15,7 +15,7 @@ const SSH_HOST_IP = process.env.SSH_HOST_IP ?? '127.0.0.1';
 async function deviceTarget(uid: string): Promise<string> {
   const cred = await repo.findByUid(uid);
   if (!cred) throw new Error(`No SSH credentials for uid=${uid}`);
-  return `${SSH_HOST_IP}:${cred.adb_port}`;
+  return `${SSH_HOST_IP}:${activePort(cred)}`;
 }
 
 async function reconnect(uid: string, target: string): Promise<void> {
@@ -230,14 +230,14 @@ export async function connect(uid: string): Promise<string> {
   return (stdout + stderr).trim();
 }
 
-export async function releaseTunnel(uid: string): Promise<string> {
+export async function releaseTunnel(uid: string): Promise<{ newPort: number }> {
   const cred = await repo.findByUid(uid);
   if (!cred) throw new Error(`No SSH credentials for uid=${uid}`);
-  const adbPort = cred.adb_port;
-  const target = `${SSH_HOST_IP}:${adbPort}`;
-  console.log(`[releaseTunnel] uid=${uid} port=${adbPort}`);
+  const oldPort = activePort(cred);
+  const target = `${SSH_HOST_IP}:${oldPort}`;
+  console.log(`[releaseTunnel] uid=${uid} oldPort=${oldPort} slot=${cred.adb_port_slot}`);
 
-  // 1. adb disconnect so the backend releases its adb connection
+  // 1. adb disconnect so the backend releases its adb connection on the old port
   try {
     const { stdout, stderr } = await execFileAsync('adb', ['disconnect', target], { timeout: 10_000 });
     console.log(`[releaseTunnel] adb disconnect → ${(stdout + stderr).trim()}`);
@@ -245,18 +245,12 @@ export async function releaseTunnel(uid: string): Promise<string> {
     console.warn(`[releaseTunnel] adb disconnect failed: ${e.message}`);
   }
 
-  // 2. Kill the sshd process that holds the reverse-tunnel port so the next
-  //    connection can bind it immediately (without waiting for ClientAliveInterval).
-  //    `fuser -k <port>/tcp` sends SIGKILL to the owning process.
-  try {
-    await execFileAsync('fuser', ['-k', `${adbPort}/tcp`], { timeout: 5_000 });
-    console.log(`[releaseTunnel] fuser killed port ${adbPort}`);
-  } catch (e: any) {
-    // fuser exits non-zero when no process owns the port — that's fine
-    console.log(`[releaseTunnel] fuser: ${e.message ?? e}`);
-  }
+  // 2. Flip slot in DB — the new activePort is on the other slot, guaranteed free
+  const updated = await repo.flipSlot(uid);
+  const newPort = activePort(updated);
+  console.log(`[releaseTunnel] slot flipped → newPort=${newPort}`);
 
-  return `released port ${adbPort}`;
+  return { newPort };
 }
 
 export async function openUrl(uid: string, url: string): Promise<string> {
