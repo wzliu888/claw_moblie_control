@@ -35,8 +35,24 @@ CREATE TABLE IF NOT EXISTS ssh_credentials (
   UNIQUE KEY uq_adb_port (adb_port)
 );
 
--- Migration: add adb_port_slot to existing tables
-ALTER TABLE ssh_credentials
-  ADD COLUMN IF NOT EXISTS adb_port_slot TINYINT NOT NULL DEFAULT 0
-    COMMENT '0 or 1; active port = adb_port + slot * 10000'
-  AFTER adb_port;
+-- Migration: add adb_port_slot to existing tables (compatible with MySQL < 8.0.3)
+-- Safe to run multiple times: INSERT IGNORE pattern via stored procedure
+DROP PROCEDURE IF EXISTS _migrate_add_adb_port_slot;
+DELIMITER $$
+CREATE PROCEDURE _migrate_add_adb_port_slot()
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME   = 'ssh_credentials'
+      AND COLUMN_NAME  = 'adb_port_slot'
+  ) THEN
+    ALTER TABLE ssh_credentials
+      ADD COLUMN adb_port_slot TINYINT NOT NULL DEFAULT 0
+        COMMENT '0 or 1; active port = adb_port + slot * 10000'
+      AFTER adb_port;
+  END IF;
+END$$
+DELIMITER ;
+CALL _migrate_add_adb_port_slot();
+DROP PROCEDURE IF EXISTS _migrate_add_adb_port_slot;

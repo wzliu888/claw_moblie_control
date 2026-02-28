@@ -1,7 +1,6 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { SshCredentialRepository, activePort } from '../repositories/ssh_credential.repository';
-import { forwardRpc } from '../ws/wsServer';
 
 const execFileAsync = promisify(execFile);
 
@@ -36,19 +35,10 @@ async function reconnect(uid: string, target: string): Promise<void> {
     console.warn(`[adb] connect failed: ${e.stderr?.trim() || e.message} — asking phone to rebuild SSH tunnel`);
   }
 
-  // adb connect failed → SSH tunnel is down. Ask the phone (via WS) to reconnect.
-  console.log(`[adb] triggering SSH tunnel rebuild for uid=${uid}`);
-  await forwardRpc(uid, 'reconnect_ssh', {});
-
-  // Give the phone time to re-establish the tunnel before retrying adb connect
-  await new Promise(r => setTimeout(r, 8_000));
-
-  try {
-    const { stdout } = await execFileAsync('adb', ['connect', target], { timeout: 60_000 });
-    console.log(`[adb] connect after SSH rebuild → ${stdout.trim()}`);
-  } catch (e: any) {
-    console.error(`[adb] connect still FAILED after SSH rebuild: ${e.stderr?.trim() || e.message}`);
-  }
+  // SSH tunnel is down — the phone's heartbeat will detect this and reconnect automatically.
+  // Do NOT push reconnect_ssh here: it races with the heartbeat and causes concurrent connects
+  // that fight over the same port ("remote port forwarding failed").
+  console.log(`[adb] SSH tunnel appears down for uid=${uid} — phone heartbeat will reconnect`);
 }
 
 async function adb(uid: string, ...args: string[]): Promise<string> {
