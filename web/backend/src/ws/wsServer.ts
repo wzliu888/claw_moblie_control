@@ -56,7 +56,9 @@ export function initWsServer(httpServer: Server): void {
     ws.on('message', (data: Buffer) => {
       // Handle JSON-RPC responses from phone
       try {
-        const msg = JSON.parse(data.toString()) as { id?: string; result?: any; error?: { message?: string } };
+        const msg = JSON.parse(data.toString()) as { id?: string; type?: string; result?: any; error?: { message?: string } };
+        // Silently discard app-level keepalive pings from phone
+        if (msg.type === 'ping') return;
         if (msg.id && pending.has(msg.id)) {
           const p = pending.get(msg.id)!;
           clearTimeout(p.timer);
